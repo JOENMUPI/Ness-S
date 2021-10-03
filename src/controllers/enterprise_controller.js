@@ -7,6 +7,9 @@ const dbQueriesEnterpriseTag = require('../config/queries/enterprise_tag');
 const dbQueriesProductTag = require('../config/queries/product_tag');
 const dbQueriesEnterprisePhone = require('../config/queries/enterprise_phone');
 const dbQueriesEnterpriseBank = require('../config/queries/enterprise_bank');
+const dbQueriesProduct = require('../config/queries/product');
+const dbQueriesVariant = require('../config/queries/variant');
+const dbQueriesExtra = require('../config/queries/extra');
 const jwt = require('jsonwebtoken');
 
 // Variables
@@ -63,7 +66,7 @@ const dataToPhone = (rows) => {
     return phones;
 }
 
-const dataTotag = (rows) => {
+const dataTotag = (rows) => { 
     const tags = [];
         
     rows.forEach(element => { 
@@ -73,7 +76,7 @@ const dataTotag = (rows) => {
         }
 
         tags.push(aux);
-    });
+    }); 
 
     return tags;
 }
@@ -128,6 +131,28 @@ const dataToLocation = (element) => {
     }       
 }
 
+const dataToProduct = (element, extras, variants) => {
+    const aux = {
+        img: element.product_img,
+        name: element.product_nam,
+        description: element.product_des,
+        id: element.product_ide,
+        price: element.product_pri,
+        status: element.product_sta,
+        extras,
+        variants,
+        productTag: {
+            id: element.product_tag_ide,
+            name: element.product_tag_des
+        }
+    }
+
+    if(aux.img != null) {
+        aux.img = aux.img.toString();
+    }
+
+    return aux;
+}
 
 const generateCode = () => {
     let char = 'abcdefghijkmnpqrtuvwxyzABCDEFGHJKMNPQRTUVWXYZ2346789';
@@ -135,8 +160,62 @@ const generateCode = () => {
     for (let i = 0; i < 10; i++) {
         pass += char.charAt(Math.floor(Math.random() * char.length)); 
     } 
-
+    
     return pass;
+}
+
+const getExrasByProductId =  async (productId) => {
+    let response = []
+    const data = await pool.query(dbQueriesExtra.getExtraByProductId, [ productId ]);
+    
+    if(data) {
+        data.rows.forEach(element => {
+            const aux = {
+                name: element.extra_nam,
+                id: element.extra_ide,
+                price: element.extra_pri,
+                status: element.extra_sta
+            }
+    
+            response.push(aux);
+        });
+    } 
+    
+    return response;
+}
+
+const getVariantsByProductId =  async (productId) => {
+    const data = await pool.query(dbQueriesVariant.getVariantByProductId, [ productId ]);
+    let response = []
+    
+    if(data) {
+        data.rows.forEach(element => {
+            const aux = {
+                name: element.variant_nam,
+                id: element.varinat_ide,
+                status: element.variant_sta
+            }
+    
+            response.push(aux);
+        });
+    } 
+    
+    return response;
+}
+
+const getProductByEnterpriseId = async (enterpriseId) => { 
+    const data = await pool.query(dbQueriesProduct.getProductByEnterpriseId, enterpriseId);
+    let response = []
+
+    if(data) {
+        for(let i = 0; i < data.rowCount; i++) { 
+            const variants = await getVariantsByProductId(data.rows[i].product_ide); 
+            const extras = await getExrasByProductId(data.rows[i].product_ide); 
+            response.push(dataToProduct(data.rows[i], extras, variants));
+        }
+    }
+
+    return response;
 }
 
 const authCode = async(userId) => {
@@ -157,7 +236,9 @@ const authCode = async(userId) => {
     return code;
 }
 
-const op = async (data, data2) => { // falta  productos
+
+
+const op = async (data, data2) => {
     const arraux = [ data.rows[0].enterprise_ide, process.env.AES_KEY ];
     const EnterpriseId = [ data.rows[0].enterprise_ide ];
     const locationId = [ data2.rows[0].location_ide ]; 
@@ -169,7 +250,7 @@ const op = async (data, data2) => { // falta  productos
     
     (banksData.rowCount > 0)  
     ? banksData = dataToBanks(banksData.rows)
-    : banksData = [];
+    : banksData = []; 
 
     (productTagData.rowCount > 0)  
     ? productTagData = dataToProductTag(productTagData.rows)
@@ -181,18 +262,19 @@ const op = async (data, data2) => { // falta  productos
 
     (phoneData.rowCount > 0) 
     ? phoneData = dataToPhone(phoneData.rows)
-    : phoneData = [];
+    : phoneData = []; 
 
     (tagData.rowCount > 0)
     ? tagData = dataTotag(tagData.rows)
-    : tagData = [];
+    : tagData = []; 
 
     resonse = dataToEnterprise(data2.rows)[0];
-    resonse.phones = phoneData;
-    resonse.tags = tagData;
+    resonse.products = await getProductByEnterpriseId(EnterpriseId);
+    resonse.phones = phoneData; 
+    resonse.tags = tagData; 
     resonse.productTag = productTagData;
-    resonse.location = locationData;
-    resonse.banks = banksData;
+    resonse.location = locationData; 
+    resonse.banks = banksData; 
 
     return resonse;
 } 

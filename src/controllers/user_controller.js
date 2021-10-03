@@ -1,8 +1,6 @@
 const Pool = require('pg').Pool;
 const bcryt = require('bcryptjs');
 const dbConfig = require('../config/db_config');
-//const twilioConfig = require('../config/twilio_config');
-//const twilioClient = require('twilio')(twilioConfig.sid, twilioConfig.token)
 const dbQueriesUser = require('../config/queries/user');
 const passwordUtil = require('../utilities/password');
 const jwt = require('jsonwebtoken');

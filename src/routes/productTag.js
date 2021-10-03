@@ -15,10 +15,10 @@ router.post(endPoint, controller.createProductTag);
 
 // Put
 router.put(endPoint, controller.updateProductTag);
+router.put(`${ endPoint }/status`, controller.deleteProductTag);
 
 
 // Delete
-router.delete(`${ endPoint }/:enterpriseId/:productTagId`, controller.deleteProductTag);
 
 // Export
 module.exports = router;

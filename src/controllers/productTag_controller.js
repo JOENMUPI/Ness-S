@@ -48,7 +48,7 @@ const updateProductTag = async (req, res) => {
 
     } else {
         const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-        const arrAux = [ tokenDecoded.id, enterpriseId ];
+        const arrAux = [ tokenDecoded.id, enterpriseId ]; 
         const adminData = await pool.query(dbQueriesAdmin.checkAdmin, arrAux);
 
         if(adminData.rowCount < 1) {
@@ -67,14 +67,14 @@ const updateProductTag = async (req, res) => {
 
 const deleteProductTag = async (req, res) => {
     const token = req.headers['x-access-token'];
-    const { enterpriseId, productTagId } = req.params;
+    const { enterpriseId, productTagId } = req.body;
 
     if(!token) {
         res.json(newReponse('Usuario sin token', 'Error'));
 
     } else {
         const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-        const arrAux = [ tokenDecoded.id, enterpriseId ];
+        const arrAux = [ tokenDecoded.id, enterpriseId ]; 
         const adminData = await pool.query(dbQueriesAdmin.checkAdmin, arrAux);
 
         if(adminData.rowCount < 1) {
