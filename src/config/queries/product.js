@@ -5,13 +5,15 @@ module.exports = {
     createProduct: `INSERT INTO ${ table } (product_nam, product_des, product_pri, product_img, product_tag_ide, enterprise_ide) 
     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,    
    
-    
     // Select
     getProductByEnterpriseId: `SELECT p.*, pt.* FROM ${ table } AS p
-    JOIN product_tag As pt ON pt.enterprise_ide = p.enterprise_ide
+    JOIN product_tag As pt ON pt.product_tag_ide = p.product_tag_ide
     WHERE (p.enterprise_ide = $1 AND p.product_sts = true)
     ORDER BY p.product_nam ASC`,
-
+    searchProductByName: `SELECT * FROM ${ table } AS p
+    JOIN product_tag AS pt ON pt.product_tag_ide = p.product_tag_ide  
+    JOIN enterprise AS e ON e.enterprise_ide = pt.enterprise_ide
+    WHERE (UPPER(p.product_nam) LIKE $1`,
     
     // Update
     updateProductById: `UPDATE ${ table } 

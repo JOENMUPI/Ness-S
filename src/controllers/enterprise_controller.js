@@ -10,6 +10,7 @@ const dbQueriesEnterpriseBank = require('../config/queries/enterprise_bank');
 const dbQueriesProduct = require('../config/queries/product');
 const dbQueriesVariant = require('../config/queries/variant');
 const dbQueriesExtra = require('../config/queries/extra');
+const dbQueriesBill = require('../config/queries/bill');
 const jwt = require('jsonwebtoken');
 
 // Variables
@@ -115,6 +116,44 @@ const dataToBanks = (rows) => {
     return banks;
 }
 
+const dataToSell = (rows) => {
+    const response = [];
+        
+    rows.forEach(element => { 
+        let aux = { 
+            user: {
+                name: element.user_nam,
+            },
+
+            bill: {
+                id: element.bill_ide,
+                mount: element.bill_mou,
+                status: element.bill_sta,
+                date: element.bill_dat_cre,
+                products: element.bill_data_jso.data,
+            },
+
+            location: {
+                cityId: element.city_ide,
+                stateId: element.state_ide,
+                locationId: element.location_ide,
+                locationDescription: element.location_des,
+                locationName: element.location_nam,
+                cityName: element.city_nam,
+                stateName: element.state_nam,
+                coordinate: {
+                    latitude: element.location_lat,
+                    longitude: element.location_lon
+                }
+            }
+        }
+
+        response.push(aux);
+    });
+
+    return response;
+}
+
 const dataToLocation = (element) => {
     return {  
         cityId: element.city_ide,
@@ -192,7 +231,7 @@ const getVariantsByProductId =  async (productId) => {
         data.rows.forEach(element => {
             const aux = {
                 name: element.variant_nam,
-                id: element.varinat_ide,
+                id: element.variant_ide,
                 status: element.variant_sta
             }
     
@@ -210,7 +249,8 @@ const getProductByEnterpriseId = async (enterpriseId) => {
     if(data) {
         for(let i = 0; i < data.rowCount; i++) { 
             const variants = await getVariantsByProductId(data.rows[i].product_ide); 
-            const extras = await getExrasByProductId(data.rows[i].product_ide); 
+            const extras = await getExrasByProductId(data.rows[i].product_ide);
+
             response.push(dataToProduct(data.rows[i], extras, variants));
         }
     }
@@ -236,8 +276,6 @@ const authCode = async(userId) => {
     return code;
 }
 
-
-
 const op = async (data, data2) => {
     const arraux = [ data.rows[0].enterprise_ide, process.env.AES_KEY ];
     const EnterpriseId = [ data.rows[0].enterprise_ide ];
@@ -254,7 +292,7 @@ const op = async (data, data2) => {
 
     (productTagData.rowCount > 0)  
     ? productTagData = dataToProductTag(productTagData.rows)
-    : productTagData = [];
+    : productTagData = []; 
 
     (locationData.rowCount > 0)  
     ? locationData = dataToLocation(locationData.rows[0])
@@ -280,33 +318,105 @@ const op = async (data, data2) => {
 } 
 
 // Logic
-const refreshEnterprise = async (req, res) => {
+const SearchEnterprise = (req, res) => {
+    const token = req.headers['x-access-token'];
+    const { search } = req.params; 
+
+    if(!token) {
+        res.json(newReponse('Usuario sin token', 'Error'));
+
+    } else {  
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+            
+            } else {
+                const arrAux = [ `%${search.toUpperCase()}%` ];
+                const data = await pool.query(dbQueriesEnterprise.searchEnterpriseByName, arrAux);
+                    
+                (data.rowCount < 1)
+                ? res.json(newReponse(`No se encontro ningun negocio con '${search}'`, 'Success', []))
+                : res.json(newReponse('Negocios econtrados', 'Success', dataToEnterprise(data.rows)));
+            }
+        });
+    }
+}
+
+const refreshEnterprise = (req, res) => {
     const token = req.headers['x-access-token'];
     const { enterpriseId } = req.params; 
 
     if(!token) {
         res.json(newReponse('Usuario sin token', 'Error'));
 
-    } else {
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-        const arrAux = [ tokenDecoded.id, enterpriseId ];
-        const data = await pool.query(dbQueriesAdmin.checkAdmin, arrAux);
-
-        if(data.rowCount < 1) {
-            res.json(newReponse('Usuario no valido para el negocio', 'Error')) 
-        
-        } else {
-            const arrAux2 = [ data.rows[0].enterprise_ide ];
-            const data2 = await pool.query(dbQueriesEnterprise.getEnterpriseById, arrAux2);
+    } else {  
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
             
-            (!data2)
-            ? res.json(newReponse('Error tomando data de empresa', 'Error'))
-            : res.json(newReponse('Negocio localizado', 'Success', await op(data, data2)));
-        }
+            } else {
+                const { iat, exp, ...tokenDecoded } = decoded;
+                const arrAux = [ tokenDecoded.id, enterpriseId ];
+                const data = await pool.query(dbQueriesAdmin.checkAdmin, arrAux);
+        
+                if(data.rowCount < 1) {
+                    res.json(newReponse('Usuario no valido para el negocio', 'Error')) 
+                
+                } else {
+                    const arrAux2 = [ data.rows[0].enterprise_ide ];
+                    const data2 = await pool.query(dbQueriesEnterprise.getEnterpriseById, arrAux2);
+                    
+                    (!data2)
+                    ? res.json(newReponse('Error tomando data de empresa', 'Error'))
+                    : res.json(newReponse('Negocio localizado', 'Success', await op(data, data2)));
+                }
+
+            } 
+        });
     }
 }
 
-const checkCode = async (req, res) => { 
+const getEnterprisesBytagId = async (req, res) => {
+    const { tagId } = req.params;
+    const data = await pool.query(dbQueriesEnterpriseTag.getEnterpriseByTagId, [ tagId ]);
+
+    (data.rowCount < 1)
+    ? res.json(newReponse('Tag sin empresas registradas', 'Success', []))
+    : res.json(newReponse('Empresas encontradas', 'Success', dataToEnterprise(data.rows)));
+}
+
+const getSellByEnterpriseId = (req, res) => {
+    const token = req.headers['x-access-token'];
+    const { enterpriseId } = req.params;
+    
+    if(!token) {
+        res.json(newReponse('Usuario sin token', 'Error'));
+
+    } else {
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+            
+            } else {
+                const { iat, exp, ...tokenDecoded } = decoded;
+                let data = await pool.query(dbQueriesAdmin.checkAdmin, [ tokenDecoded.id, enterpriseId ]);
+        
+                if(data.rowCount < 1) {
+                    res.json(newReponse('Usuario no valido para este negocio', 'Error'));
+                
+                } else {
+                    data = await pool.query(dbQueriesEnterprise.getSellByenterpriseId, [ enterpriseId ]);
+
+                    !(data.rowCount)
+                    ? res.json(newReponse('No hay pedidos', 'Success', []))
+                    : res.json(newReponse('Pedidos encontrados', 'Success', dataToSell(data.rows)));
+                }
+            }
+        });
+    }
+}
+
+const checkCode = (req, res) => { 
     const token = req.headers['x-access-token'];
     const { code } = req.body; 
 
@@ -314,21 +424,28 @@ const checkCode = async (req, res) => {
         res.json(newReponse('Usuario sin token', 'Error'));
 
     } else {
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-        const arrAux = [ tokenDecoded.id, code, process.env.AES_KEY ];
-        const data = await pool.query(dbQueriesAdmin.getEnterpriseIdByuserIdAndCode, arrAux);
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+            
+            } else {
+                const { iat, exp, ...tokenDecoded } = decoded;
+                const arrAux = [ tokenDecoded.id, code, process.env.AES_KEY ];
+                const data = await pool.query(dbQueriesAdmin.getEnterpriseIdByuserIdAndCode, arrAux);
+                
+                if(data.rowCount < 1) {
+                    res.json(newReponse('Combinacion usuario/codigo no valido para ningun negocio', 'Error'));
+                
+                } else { 
+                    const arrAux2 = [ data.rows[0].enterprise_ide ];
+                    const data2 = await pool.query(dbQueriesEnterprise.getEnterpriseById, arrAux2);
         
-        if(data.rowCount < 1) {
-            res.json(newReponse('Combinacion usuario/codigo no valido para ningun negocio', 'Error'));
-        
-        } else { 
-            const arrAux2 = [ data.rows[0].enterprise_ide ];
-            const data2 = await pool.query(dbQueriesEnterprise.getEnterpriseById, arrAux2);
-
-            (!data2) 
-            ? res.json(newReponse('Error tomando data de empresa', 'Error')) 
-            : res.json(newReponse('Combinacion usuario/codigo valido', 'Success', await op(data, data2)));
-        }
+                    (!data2) 
+                    ? res.json(newReponse('Error tomando data de empresa', 'Error')) 
+                    : res.json(newReponse('Combinacion usuario/codigo valido', 'Success', await op(data, data2)));
+                }
+            }
+        }); 
     }
 }
 
@@ -356,22 +473,70 @@ const createEnterprise = async (req, res) => {
             const data2 = await pool.query(dbQueriesEnterprise.createEnterprise, arrAux2);
 
             if(data2.rowCount > 0) {
-                const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-                let code = await authCode(tokenDecoded.id);
-                const arrAux3 = [ tokenDecoded.id, data2.rows[0].enterprise_ide, code, process.env.AES_KEY ];
-                const data3 = await pool.query(dbQueriesAdmin.createAdmin, arrAux3);
-
-
-                for(let i = 0; i < tag.length; i++) {
-                    const  arrAux4 = [ data2.rows[0].enterprise_ide, tag[i].id ];
-                    const data4 = await pool.query(dbQueriesEnterpriseTag.createTagEnterprise, arrAux4);
-                }
-
-                if(data3.rowCount > 0) {
-                    res.json(newReponse('Peticion registrada', 'Success', { code }));
-                }
+                jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+                    if(err) {
+                        res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+                    
+                    } else {
+                        const { iat, exp, ...tokenDecoded } = decoded;
+                        let code = await authCode(tokenDecoded.id);
+                        const arrAux3 = [ tokenDecoded.id, data2.rows[0].enterprise_ide, code, process.env.AES_KEY ];
+                        const data3 = await pool.query(dbQueriesAdmin.createAdmin, arrAux3);
+        
+        
+                        for(let i = 0; i < tag.length; i++) {
+                            const  arrAux4 = [ data2.rows[0].enterprise_ide, tag[i].id ];
+                            const data4 = await pool.query(dbQueriesEnterpriseTag.createTagEnterprise, arrAux4);
+                        }
+        
+                        if(data3.rowCount > 0) {
+                            res.json(newReponse('Peticion registrada', 'Success', { code }));
+                        }
+                    }
+                }); 
             }
         } 
+    }
+}
+
+const tesis = (req, res) => {
+    const token = req.headers['x-access-token'];
+    const { billId, enterpriseId, mount } = req.body;
+
+    if(!token) {
+        res.json(newReponse('Usuario sin token', 'Error'));
+
+    } else {
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+            
+            } else {
+                const { iat, exp, ...tokenDecoded } = decoded;
+                let data = await pool.query(dbQueriesAdmin.checkAdmin, [ tokenDecoded.id, enterpriseId ]);
+        
+                if(data.rowCount < 1) {
+                    res.json(newReponse('Usuario no valido para este negocio', 'Error'));
+                
+                } else {
+                    data = await pool.query(dbQueriesEnterprise.getEnterpriseById, [ enterpriseId ]);
+                    
+                    if(!data) {
+                        res.json(newReponse('Error al buscar negocio', 'Error'));
+
+                    } else {
+                        const arrAux = [ data.rows[0].enterprise_bal + mount, enterpriseId ];
+                        data = await pool.query(dbQueriesEnterprise.updateBalanceById, arrAux);
+                        data = await pool.query(dbQueriesBill.updateStatusById, [ true, billId ]); 
+
+                        
+                        (!data) 
+                        ? res.json(newReponse('Error al actualizar', 'Error'))
+                        : res.json(newReponse('Pedido prosesado', 'Success'));
+                    }
+                }
+            }
+        });
     }
 }
 
@@ -383,24 +548,31 @@ const updateHourDayByEnterpriseId = async (req, res) => {
         res.json(newReponse('Usuario sin token', 'Error'));
 
     } else {
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET);
-        let data = await pool.query(dbQueriesAdmin.checkAdmin, [ tokenDecoded.id, enterpriseId ]);
-
-        if(data.rowCount < 1) {
-            res.json(newReponse('Usuario no valido para este negocio', 'Error'));
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+            
+            } else {
+                const { iat, exp, ...tokenDecoded } = decoded;
+                let data = await pool.query(dbQueriesAdmin.checkAdmin, [ tokenDecoded.id, enterpriseId ]);
         
-        } else {
-            const arrAux = [ { closeHour, openHour, days }, enterpriseId ];
-            data = await pool.query(dbQueriesEnterprise.updateHourDaysById, arrAux);
-
-            (!data) 
-            ? res.json(newReponse('Error al actualizar horarios', 'Error'))
-            : res.json(newReponse('Horarios actualizados', 'Success'));
-        }
+                if(data.rowCount < 1) {
+                    res.json(newReponse('Usuario no valido para este negocio', 'Error'));
+                
+                } else {
+                    const arrAux = [ { closeHour, openHour, days }, enterpriseId ];
+                    data = await pool.query(dbQueriesEnterprise.updateHourDaysById, arrAux);
+        
+                    (!data) 
+                    ? res.json(newReponse('Error al actualizar horarios', 'Error'))
+                    : res.json(newReponse('Horarios actualizados', 'Success'));
+                }
+            }
+        });
     }
 }
 
-const updateImgByEnterpriseId = async (req, res) => {
+const updateImgByEnterpriseId = (req, res) => {
     const token = req.headers['x-access-token'];
     const { img, enterpriseId } = req.body;
     
@@ -408,19 +580,26 @@ const updateImgByEnterpriseId = async (req, res) => {
         res.json(newReponse('Usuario sin token', 'Error'));
 
     } else {
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET);
-        let data = await pool.query(dbQueriesAdmin.checkAdmin, [ tokenDecoded.id, enterpriseId ]);
-
-        if(data.rowCount < 1) {
-            res.json(newReponse('Usuario no valido para este negocio', 'Error'));
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+            
+            } else {
+                const { iat, exp, ...tokenDecoded } = decoded;
+                let data = await pool.query(dbQueriesAdmin.checkAdmin, [ tokenDecoded.id, enterpriseId ]);
         
-        } else {
-            data = await pool.query(dbQueriesEnterprise.updateImgById, [ img, enterpriseId ]);
-
-            (!data) 
-            ? res.json(newReponse('Error al actualizar imagen', 'Error'))
-            : res.json(newReponse('Imagen actualizados', 'Success'));
-        }
+                if(data.rowCount < 1) {
+                    res.json(newReponse('Usuario no valido para este negocio', 'Error'));
+                
+                } else {
+                    data = await pool.query(dbQueriesEnterprise.updateImgById, [ img, enterpriseId ]);
+        
+                    (!data) 
+                    ? res.json(newReponse('Error al actualizar imagen', 'Error'))
+                    : res.json(newReponse('Imagen actualizados', 'Success'));
+                }
+            }
+        });
     }
 }
 
@@ -430,5 +609,9 @@ module.exports = {
     refreshEnterprise,
     createEnterprise,
     updateImgByEnterpriseId,
-    updateHourDayByEnterpriseId
+    updateHourDayByEnterpriseId,
+    getEnterprisesBytagId,
+    SearchEnterprise,
+    getSellByEnterpriseId,
+    tesis
 }

@@ -15,7 +15,9 @@ module.exports = {
     updateVarinatById: `UPDATE ${ table } SET variant_nam = $1, variant_sta = $2  
     WHERE (variant_ide = $3 AND product_ide = $4)`,
     varinatOffById: `UPDATE ${ table } SET variant_sts = $1 
-    WHERE (variant_ide = $2 AND product_ide = $3)`
+    WHERE (variant_ide = $2 AND product_ide = $3)`,
+    variantsOffByProductId: `UPDATE ${ table } SET variant_sts = $1 
+    WHERE (product_ide = $2)`,
 
 
     // Delete

@@ -39,7 +39,7 @@ const getBanks = async (req, res) => {
     : res.json(newReponse('Bancos encontrados', 'Success', dataToBank(data.rows)));
 }
 
-const createEnterpriseBank = async (req, res) => {
+const createEnterpriseBank = (req, res) => {
     const token = req.headers['x-access-token'];
     const { countNum, titularName, titularId, bankId, enterpriseId } = req.body;
 
@@ -47,53 +47,60 @@ const createEnterpriseBank = async (req, res) => {
         res.json(newReponse('Usuario sin token', 'Error'));
 
     } else { 
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-        let arrAux = [ tokenDecoded.id, enterpriseId ];
-        let countBankData = await pool.query(dbQueriesAdmin.checkAdmin, arrAux);
-        let countBankId;
-        
-        if(countBankData.rowCount < 1) {
-            res.json(newReponse('Usuario no valido para este negocio', 'Error'))
-
-        } else { 
-            arrAux = [ countNum, process.env.AES_KEY ];
-            countBankData = await pool.query(dbQueriesCountBank.getEnterpriseByNum, arrAux); 
-    
-            if (countBankData.rowCount > 0) { 
-                countBankId = countBankData.rows[0].count_bank_ide; 
-                
-            } else { 
-                arrAux = [ titularName, titularId, countNum, bankId, process.env.AES_KEY ]; 
-                countBankData = await pool.query(dbQueriesCountBank.createCountBank, arrAux);
-                
-                (!countBankData)
-                ? res.json(newReponse('Error creando la cuenta bancaria', 'Error'))
-                : countBankId = countBankData.rows[0].count_bank_ide;
-            }
-    
-            arrAux = [ enterpriseId, countBankId ]; 
-            countBankData = await pool.query(dbQueriesEnterpriseBank.checkEnterprisBankById, arrAux);
-    
-            if(countBankData.rowCount > 0) {
-                if (!countBankData.rows[0].enterprise_bank_sta) {
-                    const aux2 = [ true, enterpriseId, countBankId ]; 
-                    countBankData = await pool.query(dbQueriesEnterpriseBank.updateStatusById, aux2);    
-                } 
-    
-                res.json(newReponse('Cuenta bancaria relacionada', 'Success', { id: countBankId }));
-                
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+            
             } else {
-                countBankData = await pool.query(dbQueriesEnterpriseBank.createenterpriseBank, arrAux);
+                const { iat, exp, ...tokenDecoded } = decoded;
+                let arrAux = [ tokenDecoded.id, enterpriseId ];
+                let countBankData = await pool.query(dbQueriesAdmin.checkAdmin, arrAux);
+                let countBankId;
                 
-                (!countBankData)
-                ? res.json(newReponse('Error relacionando la cuenta bancaria', 'Error'))
-                : res.json(newReponse('Cuenta bancaria relacionada', 'Success', { id: countBankId }));
+                if(countBankData.rowCount < 1) {
+                    res.json(newReponse('Usuario no valido para este negocio', 'Error'))
+        
+                } else { 
+                    arrAux = [ countNum, process.env.AES_KEY ];
+                    countBankData = await pool.query(dbQueriesCountBank.getEnterpriseByNum, arrAux); 
+            
+                    if (countBankData.rowCount > 0) { 
+                        countBankId = countBankData.rows[0].count_bank_ide; 
+                        
+                    } else { 
+                        arrAux = [ titularName, titularId, countNum, bankId, process.env.AES_KEY ]; 
+                        countBankData = await pool.query(dbQueriesCountBank.createCountBank, arrAux);
+                        
+                        (!countBankData)
+                        ? res.json(newReponse('Error creando la cuenta bancaria', 'Error'))
+                        : countBankId = countBankData.rows[0].count_bank_ide;
+                    }
+            
+                    arrAux = [ enterpriseId, countBankId ]; 
+                    countBankData = await pool.query(dbQueriesEnterpriseBank.checkEnterprisBankById, arrAux);
+            
+                    if(countBankData.rowCount > 0) {
+                        if (!countBankData.rows[0].enterprise_bank_sta) {
+                            const aux2 = [ true, enterpriseId, countBankId ]; 
+                            countBankData = await pool.query(dbQueriesEnterpriseBank.updateStatusById, aux2);    
+                        } 
+            
+                        res.json(newReponse('Cuenta bancaria relacionada', 'Success', { id: countBankId }));
+                        
+                    } else {
+                        countBankData = await pool.query(dbQueriesEnterpriseBank.createenterpriseBank, arrAux);
+                        
+                        (!countBankData)
+                        ? res.json(newReponse('Error relacionando la cuenta bancaria', 'Error'))
+                        : res.json(newReponse('Cuenta bancaria relacionada', 'Success', { id: countBankId }));
+                    }
+                }
             }
-        }
+        }); 
     }
 }
 
-const updateStateEnterpriseBank = async (req, res) => {
+const updateStateEnterpriseBank = (req, res) => {
     const token = req.headers['x-access-token'];
     const { countBankId, enterpriseId } = req.body;
 
@@ -101,21 +108,28 @@ const updateStateEnterpriseBank = async (req, res) => {
         res.json(newReponse('Usuario sin token', 'Error'));
 
     } else {
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-        let arrAux = [ tokenDecoded.id, enterpriseId ];
-        let data = await pool.query(dbQueriesAdmin.checkAdmin, arrAux);
-
-        if(data.rowCount < 1) {
-            res.json(newReponse('Usuario no valido para este negocio', 'Error'))
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+            
+            } else {
+                const { iat, exp, ...tokenDecoded } = decoded;
+                let arrAux = [ tokenDecoded.id, enterpriseId ];
+                let data = await pool.query(dbQueriesAdmin.checkAdmin, arrAux);
         
-        } else {
-            arrAux = [ false, enterpriseId, countBankId ];
-            data = await pool.query(dbQueriesEnterpriseBank.updateStatusById, arrAux);
-    
-            (!data) 
-            ? res.json(newReponse('Error actualizando status de relacion cuenta/empresa', 'Error'))
-            : res.json(newReponse('Relacion cuenta/empresa actualizada', 'Success'));
-        }
+                if(data.rowCount < 1) {
+                    res.json(newReponse('Usuario no valido para este negocio', 'Error'))
+                
+                } else {
+                    arrAux = [ false, enterpriseId, countBankId ];
+                    data = await pool.query(dbQueriesEnterpriseBank.updateStatusById, arrAux);
+            
+                    (!data) 
+                    ? res.json(newReponse('Error actualizando status de relacion cuenta/empresa', 'Error'))
+                    : res.json(newReponse('Relacion cuenta/empresa actualizada', 'Success'));
+                }
+            }
+        }); 
     }
 }
 

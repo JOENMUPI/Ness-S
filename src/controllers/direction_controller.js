@@ -39,23 +39,30 @@ const dataToLocation = (rows) => {
 
 
 // Logic
-const getUserLocation = async (req, res) => {
+const getUserLocation = (req, res) => {
     const token = req.headers['x-access-token'];
 
     if(!token) {
         res.json(newReponse('Usuario sin token', 'Error', { }));
     } else {
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-        const data = await pool.query(dbQueriesUserLocation.getLocationByUser, [ tokenDecoded.id ]);
-
-        if(!data) {
-            res.json(newReponse('Error al buscar locaciones', 'Error', { }));
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+            
+            } else {
+                const { iat, exp, ...tokenDecoded } = decoded;
+                const data = await pool.query(dbQueriesUserLocation.getLocationByUser, [ tokenDecoded.id ]);
         
-        } else {
-            (data.rowCount < 1)
-            ? res.json(newReponse('No posee locaciones', 'Success', []))
-            : res.json(newReponse('sus locaciones', 'Success', dataToLocation(data.rows)));
-        }
+                if(!data) {
+                    res.json(newReponse('Error al buscar locaciones', 'Error', { }));
+                
+                } else {
+                    (data.rowCount < 1)
+                    ? res.json(newReponse('No posee locaciones', 'Success', []))
+                    : res.json(newReponse('sus locaciones', 'Success', dataToLocation(data.rows)));
+                }
+            }
+        }); 
     }
 }
 
@@ -107,13 +114,20 @@ const createUserLocation = async (req, res) => {
             res.json(newReponse('Error al crear locacion', 'Error', { }));  
         
         } else {
-            const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-            const arrAux2 = [ tokenDecoded.id, data.rows[0].location_ide ];
-            const data2 = await pool.query(dbQueriesUserLocation.createUserLocation, arrAux2);
-
-            (!data2)
-            ? res.json(newReponse('Error al relacionar locacion con usuario', 'Error', { }))
-            : res.json(newReponse('Locacion registrada', 'Success', { id: data.rows[0].location_ide })); 
+            jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+                if(err) {
+                    res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+                
+                } else {
+                    const { iat, exp, ...tokenDecoded } = decoded;
+                    const arrAux2 = [ tokenDecoded.id, data.rows[0].location_ide ];
+                    const data2 = await pool.query(dbQueriesUserLocation.createUserLocation, arrAux2);
+        
+                    (!data2)
+                    ? res.json(newReponse('Error al relacionar locacion con usuario', 'Error', { }))
+                    : res.json(newReponse('Locacion registrada', 'Success', { id: data.rows[0].location_ide })); 
+                }
+            }); 
         }
     }
 }
@@ -126,7 +140,6 @@ const updateLocation = async (req, res) => {
         res.json(newReponse('Usuarion sin token', 'Error', { }));
 
     } else {
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
         const aux = [ 
             stateId, 
             cityId, 
@@ -136,7 +149,7 @@ const updateLocation = async (req, res) => {
             coordinate.longitude,   
             locationId,
         ]; 
-
+        
         const data = await pool.query(dbQueriesLocation.updateLocationById, aux);
         
         (data)
@@ -145,7 +158,7 @@ const updateLocation = async (req, res) => {
     }
 }
 
-const deleteUserLocation = async (req, res) => {
+const deleteUserLocation = (req, res) => {
     const token = req.headers['x-access-token'];
     const { directionId } = req.params;
 
@@ -153,13 +166,20 @@ const deleteUserLocation = async (req, res) => {
         res.json(newReponse('Usuarion sin token', 'Error', { }));
     
     } else {
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-        const arrAux = [ directionId, tokenDecoded.id ]; 
-        const data = await pool.query(dbQueriesUserLocation.deleteLocationById, arrAux);
-
-        (data)
-        ? res.json(newReponse('Locacion eliminada', 'Success', { }))
-        : res.json(newReponse('Error eliminando locacion', 'Error', { }));
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+            
+            } else {
+                const { iat, exp, ...tokenDecoded } = decoded;
+                const arrAux = [ directionId, tokenDecoded.id ]; 
+                const data = await pool.query(dbQueriesUserLocation.deleteLocationById, arrAux);
+        
+                (data)
+                ? res.json(newReponse('Locacion eliminada', 'Success', { }))
+                : res.json(newReponse('Error eliminando locacion', 'Error', { }));
+            }
+        }); 
     }
 }
 

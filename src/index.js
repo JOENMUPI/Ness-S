@@ -37,6 +37,8 @@ app.use(require('./routes/productTag'));
 app.use(require('./routes/bank'));
 app.use(require('./routes/withdraw'));
 app.use(require('./routes/product'));
+app.use(require('./routes/cart'));
+app.use(require('./routes/bill'));
 
 // Server Listen
 app.listen(app.get('port'), () => {

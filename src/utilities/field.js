@@ -4,7 +4,7 @@ const checkFields = (fields) => {
         let flag = true;
 
         fields.forEach((Element) => {
-            if(Element.length <= 0) {
+            if(Element.length < 1) {
                 flag = false;
             }
         });
@@ -12,6 +12,7 @@ const checkFields = (fields) => {
         return flag; 
     
     } catch(e) {
+        console.error(e);
         return false;
     }
 }

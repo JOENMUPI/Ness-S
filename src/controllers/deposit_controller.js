@@ -71,16 +71,23 @@ const getDepositByUser = async (req, res) => {
         res.json(newReponse('Usuario sin token', 'Error', { }));
 
     } else { 
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-        const data = await pool.query(dbQueriesdeposit.getDepositByUserId, [ tokenDecoded.id ]);
-
-        (data.rowCount < 1)
-        ? res.json(newReponse('Historial vacio', 'Success', []))
-        : res.json(newReponse('Hitorial encontrado', 'Success', dataToDeposit(data.rows))); 
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+            
+            } else {
+                const { iat, exp, ...tokenDecoded } = decoded;
+                const data = await pool.query(dbQueriesdeposit.getDepositByUserId, [ tokenDecoded.id ]);
+        
+                (data.rowCount < 1)
+                ? res.json(newReponse('Historial vacio', 'Success', []))
+                : res.json(newReponse('Hitorial encontrado', 'Success', dataToDeposit(data.rows))); 
+            }
+        }); 
     }
 }
 
-const createDeposit = async (req, res) => { 
+const createDeposit = (req, res) => { 
     const token = req.headers['x-access-token'];
     const { img, mountTotransfer, mountToDeposit, depositTypeId } = req.body;
     
@@ -88,37 +95,44 @@ const createDeposit = async (req, res) => {
         res.json(newReponse('Usuario sin token', 'Error', { }));
 
     } else { 
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-        const arrAux = [ 
-            new Date(), 
-            true, 
-            mountTotransfer, 
-            mountToDeposit, 
-            depositTypeId, 
-            img.img, 
-            tokenDecoded.id 
-        ];
-
-        const data = await pool.query(dbQueriesdeposit.createLocation, arrAux);
-    
-        if (!data) {
-            res.json(newReponse('Error al crear deposito', 'Error', { }));
-
-        } else {
-            let data2 = await pool.query(dbQueriesUser.getUserById, [ tokenDecoded.id ]);
-            
-            if(!data2) { 
-                res.json(newReponse('Usuario no encontrado', 'Error', { }))
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
             
             } else {
-                const newBalance = Number.parseFloat(mountToDeposit) + data2.rows[0].user_bal; 
-                data2 = await pool.query(dbQueriesUser.updateBalanceById, [ newBalance, tokenDecoded.id ]);
-                
-                !(data2)
-                ? res.json(newReponse('Error actualizando balance', 'Error', { }))
-                : res.json(newReponse('Deposito registrado', 'Success', { })); 
+                const { iat, exp, ...tokenDecoded } = decoded;
+                const arrAux = [ 
+                    new Date(), 
+                    true, 
+                    mountTotransfer, 
+                    mountToDeposit, 
+                    depositTypeId, 
+                    img.img, 
+                    tokenDecoded.id 
+                ];
+        
+                const data = await pool.query(dbQueriesdeposit.createLocation, arrAux);
+            
+                if (!data) {
+                    res.json(newReponse('Error al crear deposito', 'Error', { }));
+        
+                } else {
+                    let data2 = await pool.query(dbQueriesUser.getUserById, [ tokenDecoded.id ]);
+                    
+                    if(!data2) { 
+                        res.json(newReponse('Usuario no encontrado', 'Error', { }))
+                    
+                    } else {
+                        const newBalance = Number.parseFloat(mountToDeposit) + data2.rows[0].user_bal; 
+                        data2 = await pool.query(dbQueriesUser.updateBalanceById, [ newBalance, tokenDecoded.id ]);
+                        
+                        !(data2)
+                        ? res.json(newReponse('Error actualizando balance', 'Error', { }))
+                        : res.json(newReponse('Deposito registrado', 'Success', { })); 
+                    }
+                }
             }
-        }
+        }); 
     }
 }
 

@@ -7,7 +7,7 @@ module.exports = {
     
 
     // Select 
-    getPhoneNumberById: `SELECT phone_num FROM ${ table } WHERE phone_ide = $1`,
+    getOnlyPhoneNumberById: `SELECT PGP_SYM_decrypt(phone_num, $2) FROM ${ table } WHERE phone_ide = $1`,
     getPhoneNumberByNum: `SELECT * FROM ${ table } 
     WHERE PGP_SYM_decrypt(phone_num, $2) = $1`,
 

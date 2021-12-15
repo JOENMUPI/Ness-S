@@ -7,6 +7,7 @@ const endPoint = '/user';
 
 // Get
 router.get(`${ endPoint }/id`, user.getUserById);
+router.get(`${ endPoint }/phoneNumber/:userId`, user.getNumByUserId);
 
 
 // Post
@@ -16,7 +17,8 @@ router.post(`${ endPoint }/check/email`, user.checkEmail);
 
 
 // Put
-
+router.put(`${ endPoint }/pass`, user.updatePass);
+router.put(`${ endPoint }/field`, user.updateField);
 
 // Delete
 

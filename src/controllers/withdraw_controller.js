@@ -27,8 +27,8 @@ const dataTowithdraw = (rows) => {
             status: element.withdraw_sta,
             mount_date: element.withdraw_dat_cre,
             countBank: {
-                countNum: element.count_bank_num,
-                titularName: element.count_bank_nam,
+                countNum: element.pgp_sym_decrypt,
+                titularName: element.count_bank_tit,
                 titularId: element.count_bank_tit_ide,
                 countBankId: element.count_bank_ide,
                 bankName: element.bank_des,
@@ -44,7 +44,7 @@ const dataTowithdraw = (rows) => {
 
 
 // Logic
-const getWithdrawByEnterpriseId = async (req, res) => { 
+const getWithdrawByEnterpriseId = (req, res) => { 
     const token = req.headers['x-access-token'];
     const { enterpriseId } = req.params;
     
@@ -52,26 +52,34 @@ const getWithdrawByEnterpriseId = async (req, res) => {
         res.json(newReponse('Usuario sin token', 'Error'));
 
     } else {
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET);
-        let arraux = [ tokenDecoded.id, enterpriseId ];
-        let data = await pool.query(dbQueriesAdmin.checkAdmin, arraux);
-
-        if(data.rowCount < 1) {
-            res.json(newReponse('Usuario no valido para este negocio', 'Error'));
-
-        } else {
-            let data = await pool.query(dbQueriesEnterpriseWithdraw.getEnterpriseWithdrawByEnterpriseId, [ enterpriseId ]);
-
-            (!data)
-            ? res.json(newReponse('Error al encontrar los retiros', 'Error', { }))
-            : (data.rowCount > 0) 
-            ? res.json(newReponse('Retiros localizados', 'Success', dataTowithdraw(data.rows)))
-            : res.json(newReponse('Sin retiros', 'Success', []));
-        }
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+            
+            } else {
+                const { iat, exp, ...tokenDecoded } = decoded;
+                let arraux = [ tokenDecoded.id, enterpriseId ];
+                let data = await pool.query(dbQueriesAdmin.checkAdmin, arraux);
+        
+                if(data.rowCount < 1) {
+                    res.json(newReponse('Usuario no valido para este negocio', 'Error'));
+        
+                } else {
+                    arraux = [ enterpriseId, process.env.AES_KEY ];
+                    let data = await pool.query(dbQueriesEnterpriseWithdraw.getEnterpriseWithdrawByEnterpriseId, arraux);
+                    
+                    (!data)
+                    ? res.json(newReponse('Error al encontrar los retiros', 'Error', { }))
+                    : (data.rowCount > 0) 
+                    ? res.json(newReponse('Retiros localizados', 'Success', dataTowithdraw(data.rows)))
+                    : res.json(newReponse('Sin retiros', 'Success', []));
+                }
+            }
+        });
     }
 }
 
-const createEnterpriseWithdraw = async (req, res) => { 
+const createEnterpriseWithdraw = (req, res) => { 
     const token = req.headers['x-access-token'];
     const { enterpriseId, mountTotransfer, mountToWithdraw, countBank } = req.body;
     
@@ -79,51 +87,58 @@ const createEnterpriseWithdraw = async (req, res) => {
         res.json(newReponse('Usuario sin token', 'Error', { }));
 
     } else { 
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-        let arrAux = [ tokenDecoded.id, enterpriseId ];
-        let data = await pool.query(dbQueriesAdmin.checkAdmin, arrAux);
-
-        if(data.rowCount < 1) {
-            res.json(newReponse('Usuario no valido para este negocio', 'Error'));
-
-        } else {
-            let data2 = await pool.query(dbQueriesEnterprise.getEnterpriseById, [ enterpriseId ]);
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
             
-            if (!data2) {
-                res.json(newReponse('Error buscando el negocio', 'Error'))
-                
             } else {
-                const newBalance = data2.rows[0].enterprise_bal - Number.parseFloat(mountToWithdraw);
-                
-                if(newBalance < 0) {
-                    res.json(newReponse('Su retiro es mayor a su verdadero balance', 'Caso tesis'))
-                
+                const { iat, exp, ...tokenDecoded } = decoded;
+                let arrAux = [ tokenDecoded.id, enterpriseId ];
+                let data = await pool.query(dbQueriesAdmin.checkAdmin, arrAux);
+        
+                if(data.rowCount < 1) {
+                    res.json(newReponse('Usuario no valido para este negocio', 'Error'));
+        
                 } else {
-                    arrAux = [ new Date(), true, mountTotransfer, mountToWithdraw ];
-                    data = await pool.query(dbQueriesWithdraw.createWithdraw, arrAux);
+                    let data2 = await pool.query(dbQueriesEnterprise.getEnterpriseById, [ enterpriseId ]);
                     
-                    if(!data) {
-                        res.json(newReponse('Error al crear retiro', 'Error', { }));
+                    if (!data2) {
+                        res.json(newReponse('Error buscando el negocio', 'Error'))
                         
                     } else {
-                        let arrAux2 = [ data.rows[0].withdraw_ide, enterpriseId, countBank.countBankId ];
-                        data2 = await pool.query(dbQueriesEnterpriseWithdraw.createEnterpriseWithdraw, arrAux2);
+                        const newBalance = data2.rows[0].enterprise_bal - Number.parseFloat(mountToWithdraw);
                         
-                        if(!data2) {
-                            res.json(newReponse('Error relacionando retiro con empresa', 'Error'));
-                            
+                        if(newBalance < 0) {
+                            res.json(newReponse('Su retiro es mayor a su verdadero balance', 'Caso tesis'))
+                        
                         } else {
-                            arrAux2 = [ newBalance, enterpriseId ];    
-                            data2 = await pool.query(dbQueriesEnterprise.updateBalanceById, arrAux2);
-    
-                            (!data2)
-                            ? res.json(newReponse('Error actualizando balance del negocio', 'Error'))
-                            : res.json(newReponse('Retiro enviado', 'Success')); 
+                            arrAux = [ new Date(), true, mountTotransfer, mountToWithdraw ];
+                            data = await pool.query(dbQueriesWithdraw.createWithdraw, arrAux);
+                            
+                            if(!data) {
+                                res.json(newReponse('Error al crear retiro', 'Error', { }));
+                                
+                            } else {
+                                let arrAux2 = [ data.rows[0].withdraw_ide, enterpriseId, countBank.countBankId ];
+                                data2 = await pool.query(dbQueriesEnterpriseWithdraw.createEnterpriseWithdraw, arrAux2);
+                                
+                                if(!data2) {
+                                    res.json(newReponse('Error relacionando retiro con empresa', 'Error'));
+                                    
+                                } else {
+                                    arrAux2 = [ newBalance, enterpriseId ];    
+                                    data2 = await pool.query(dbQueriesEnterprise.updateBalanceById, arrAux2);
+            
+                                    (!data2)
+                                    ? res.json(newReponse('Error actualizando balance del negocio', 'Error'))
+                                    : res.json(newReponse('Retiro enviado', 'Success')); 
+                                }
+                            }
                         }
                     }
                 }
             }
-        }
+        }); 
     }
 }
 

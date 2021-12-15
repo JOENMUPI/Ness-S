@@ -9,6 +9,9 @@ module.exports = {
     getTagByEnterpriseId: `SELECT t.* FROM ${ table } AS et
     JOIN tag As t ON t.tag_ide = et.tag_ide 
     WHERE et.enterprise_ide = $1`,
+    getEnterpriseByTagId: `SELECT e.* FROM ${ table } AS et
+    JOIN enterprise AS e ON e.enterprise_ide = et.enterprise_ide 
+    WHERE et.tag_ide = $1`
     
     // Update
     

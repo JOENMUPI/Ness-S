@@ -8,8 +8,9 @@ module.exports = {
     
     // Select
     getProductTagByEnterpriseId: `SELECT * FROM ${ table }
-    WHERE (enterprise_ide = $1 AND product_tag_sts = true)`,
-
+    WHERE (enterprise_ide = $1 AND product_tag_sts = true) 
+    ORDER BY product_tag_des ASC`,
+    
     
     // Update
     updateProductTagById: `UPDATE ${ table } 

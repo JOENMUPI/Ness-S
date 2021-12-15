@@ -12,10 +12,12 @@ module.exports = {
 
     
     // Update
-    updateExtraById: `UPDATE ${ table } SET extra_nam = $1, extra_pri = $2, extra_sta = $3,  
+    updateExtraById: `UPDATE ${ table } SET extra_nam = $1, extra_pri = $2, extra_sta = $3  
     WHERE (extra_ide = $4 AND product_ide = $5)`,
     extraOffById: `UPDATE ${ table } SET extra_sts = $1 
-    WHERE (extra_ide = $2 AND product_ide = $3)`
+    WHERE (extra_ide = $2 AND product_ide = $3)`,
+    extrasOffByProductId: `UPDATE ${ table } SET extra_sts = $1 
+    WHERE (product_ide = $2)`
 
 
     // Delete

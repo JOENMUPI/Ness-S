@@ -39,7 +39,7 @@ const createProductTag = async (req, res) => {
     }
 }
 
-const updateProductTag = async (req, res) => {
+const updateProductTag = (req, res) => {
     const token = req.headers['x-access-token'];
     const { name, enterpriseId, id } = req.body;
 
@@ -47,25 +47,32 @@ const updateProductTag = async (req, res) => {
         res.json(newReponse('Usuario sin token', 'Error'));
 
     } else {
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-        const arrAux = [ tokenDecoded.id, enterpriseId ]; 
-        const adminData = await pool.query(dbQueriesAdmin.checkAdmin, arrAux);
-
-        if(adminData.rowCount < 1) {
-            res.json(newReponse('Usuario no valido para este negocio', 'Error'));
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+            
+            } else {
+                const { iat, exp, ...tokenDecoded } = decoded;
+                const arrAux = [ tokenDecoded.id, enterpriseId ]; 
+                const adminData = await pool.query(dbQueriesAdmin.checkAdmin, arrAux);
         
-        } else {
-            const arrAux = [ name, id, enterpriseId ];
-            const data = await pool.query(dbQueriesProductTag.updateProductTagById, arrAux);
-    
-            (!data) 
-            ? res.json(newReponse('Error actualizando seccion de producto', 'Error', { }))
-            : res.json(newReponse('seccion actualizada', 'Success', { }));
-        }
+                if(adminData.rowCount < 1) {
+                    res.json(newReponse('Usuario no valido para este negocio', 'Error'));
+                
+                } else {
+                    const arrAux = [ name, id, enterpriseId ];
+                    const data = await pool.query(dbQueriesProductTag.updateProductTagById, arrAux);
+            
+                    (!data) 
+                    ? res.json(newReponse('Error actualizando seccion de producto', 'Error', { }))
+                    : res.json(newReponse('seccion actualizada', 'Success', { }));
+                }
+            }
+        }); 
     }
 }
 
-const deleteProductTag = async (req, res) => {
+const deleteProductTag = (req, res) => {
     const token = req.headers['x-access-token'];
     const { enterpriseId, productTagId } = req.body;
 
@@ -73,21 +80,28 @@ const deleteProductTag = async (req, res) => {
         res.json(newReponse('Usuario sin token', 'Error'));
 
     } else {
-        const { iat, exp, ...tokenDecoded } = jwt.verify(token, process.env.SECRET); 
-        const arrAux = [ tokenDecoded.id, enterpriseId ]; 
-        const adminData = await pool.query(dbQueriesAdmin.checkAdmin, arrAux);
-
-        if(adminData.rowCount < 1) {
-            res.json(newReponse('Usuario no valido para este negocio', 'Error'));
+        jwt.verify(token, process.env.SECRET, async (err, decoded) => {
+            if(err) {
+                res.json(newReponse('Token expirado, vuelva a loguear', 'Error'));
+            
+            } else {
+                const { iat, exp, ...tokenDecoded } = decoded;
+                const arrAux = [ tokenDecoded.id, enterpriseId ]; 
+                const adminData = await pool.query(dbQueriesAdmin.checkAdmin, arrAux);
         
-        } else {
-            const arrAux = [ productTagId, enterpriseId ];
-            const data = await pool.query(dbQueriesProductTag.deleteProductTagById, arrAux);
-    
-            (!data) 
-            ? res.json(newReponse('Error eliminando seccion de producto', 'Error'))
-            : res.json(newReponse('seccion eliminada', 'Success'));
-        }
+                if(adminData.rowCount < 1) {
+                    res.json(newReponse('Usuario no valido para este negocio', 'Error'));
+                
+                } else {
+                    const arrAux = [ productTagId, enterpriseId ];
+                    const data = await pool.query(dbQueriesProductTag.deleteProductTagById, arrAux);
+            
+                    (!data) 
+                    ? res.json(newReponse('Error eliminando seccion de producto', 'Error'))
+                    : res.json(newReponse('seccion eliminada', 'Success'));
+                }
+            }
+        }); 
     }
 }
 
